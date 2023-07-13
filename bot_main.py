@@ -174,8 +174,14 @@ class AphBot:
         elif text == "Профиль":
             user_info = self.db.get_user_by_param("username", message.from_user.username)
             if user_info is not None:
-                user_info_str = "\n".join([f"{k}: {v}" for k, v in user_info.items()])
-                await message.reply(f"Ваш профиль:\n{user_info_str}", reply_markup=self.menu_markups["buyer"])
+
+                await message.answer("*Профиль* \n"
+                                                "Имя: *" + message.from_user.full_name + "*\n"
+                                                "Username: *" + "@"+ str(user_info["username"]) + "*\n"                                        
+                                                "Дата присоединения: _" + str(user_info["join_date"]) + "_\n"
+                                                "Рейтинг: _" + str(user_info["ratings"]) + "_\n"                                                        
+                                                "*Успешных сделок, как покупатель*: _" + str(user_info["orders_as_buyer"]) + "_\n", parse_mode="Markdown", reply_markup=self.menu_markups["buyer"])
+
             else:
                 await message.reply("Ошибка при получении данных профиля", reply_markup=self.menu_markups["buyer"])
             await ST.Buyer.set()
@@ -190,6 +196,22 @@ class AphBot:
         text = message.text
         if text == "Посмотреть заказы":
             await message.reply("Заявок пока нет", reply_markup=self.menu_markups["salesman"])
+            await ST.Salesman.set()
+        elif text == "Профиль":
+            user_info = self.db.get_user_by_param("username", message.from_user.username)
+            if user_info is not None:
+                # user_info_str = "\n".join([f"{k}: {v}" for k, v in user_info.items()])
+                # await message.reply(f"Ваш профиль:\n{user_info_str}", reply_markup=self.menu_markups["buyer"])
+
+                await message.answer("*Профиль* \n"
+                                                "Имя: *" + message.from_user.full_name + "*\n"
+                                                "Username: *" + "@"+ str(user_info["username"]) + "*\n"                                        
+                                                "Дата присоединения: _" + str(user_info["join_date"]) + "_\n"
+                                                "Рейтинг: _" + str(user_info["ratings"]) + "_\n"    
+                                                "*Успешных сделок, как продавец*: _" + str(user_info["orders_as_seller"]) + "_\n", parse_mode="Markdown", reply_markup=self.menu_markups["salesman"])
+
+            else:
+                await message.reply("Ошибка при получении данных профиля", reply_markup=self.menu_markups["buyer"])
             await ST.Salesman.set()
         elif text == "Выйти":
             await message.reply("Вы вышли из раздела 'Продавец'", reply_markup=self.menu_markups["start"])
