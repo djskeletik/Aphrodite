@@ -101,6 +101,7 @@
 
 
 import logging
+import secrets
 from aiogram import Bot, Dispatcher, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.contrib.middlewares.logging import LoggingMiddleware
@@ -141,6 +142,7 @@ class AphBot:
         self.dp.message_handler(state=ST.Menu)(self.menu)
         self.dp.message_handler(state=ST.Buyer)(self.menu_buyer)
         self.dp.message_handler(state=ST.Salesman)(self.menu_salesman)
+        self.dp.message_handler(state=ST.Application_register)(self.application_register)
         # Uncomment the following line when you implement `menu_applications` function
         # self.dp.message_handler(state=ST.Application_register)(self.menu_applications)
 
@@ -169,7 +171,7 @@ class AphBot:
     async def menu_buyer(self, message: types.Message):
         text = message.text
         if text == "Зарегать заявку":
-            await message.reply("Скиньте ссылку на товар")
+            await message.reply("Скиньте ссылку на товар", reply_markup= None)
             await ST.Application_register.set()
         elif text == "Профиль":
             user_info = self.db.get_user_by_param("username", message.from_user.username)
@@ -195,13 +197,15 @@ class AphBot:
     async def menu_salesman(self, message: types.Message):
         text = message.text
         if text == "Посмотреть заказы":
-            await message.reply("Заявок пока нет", reply_markup=self.menu_markups["salesman"])
+            await message.reply("Заявки:", reply_markup=self.menu_markups["salesman"])
+            orders_info = self.db.get_orders()
+            for order in orders_info:
+                await message.answer(order["item_link"])
+            await message.reply("Все", reply_markup=self.menu_markups["salesman"])
             await ST.Salesman.set()
         elif text == "Профиль":
             user_info = self.db.get_user_by_param("username", message.from_user.username)
             if user_info is not None:
-                # user_info_str = "\n".join([f"{k}: {v}" for k, v in user_info.items()])
-                # await message.reply(f"Ваш профиль:\n{user_info_str}", reply_markup=self.menu_markups["buyer"])
 
                 await message.answer("*Профиль* \n"
                                                 "Имя: *" + message.from_user.full_name + "*\n"
@@ -219,6 +223,15 @@ class AphBot:
         else:
             await message.reply("Что-то непонятное вводишь", reply_markup=self.menu_markups["salesman"])
             await ST.Salesman.set()
+
+    async def application_register(self, message: types.Message):
+        text = message.text
+        token = secrets.token_hex(16)
+        self.db.add_thing(token, "clothes", "item_name", "manufacturer", 100, 100 ,message.from_user.id, message.from_user.username, text, description=None)
+        await message.reply("Закакз добавлен, ожидайте отклика продавцов", reply_markup=self.menu_markups["buyer"])
+        await ST.Buyer.set()
+
+
 
     def run(self):
         from aiogram import executor

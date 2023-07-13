@@ -73,6 +73,13 @@ class DB:
             """, (order_token,))
             return cursor.fetchall()
 
+    def get_orders(self):
+        with self.connection.cursor() as cursor:
+            cursor.execute("""
+            SELECT * FROM aph_things
+            """)
+            return cursor.fetchall()
+
     def get_user_by_param(self, param, value):
         with self.connection.cursor() as cursor:
             cursor.execute(f"""
