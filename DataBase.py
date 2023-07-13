@@ -1,6 +1,6 @@
-import pymysql
-import json
 from datetime import datetime
+import pymysql
+
 
 class DB:
     def __init__(self, host, user, password, db_name):
@@ -38,9 +38,8 @@ class DB:
                 manufacturer VARCHAR(100) NOT NULL,
                 average_price FLOAT NOT NULL,
                 delivery_markup FLOAT NOT NULL,
-                customer_full_name VARCHAR(100) NOT NULL,
-                customer_chat_id INT NOT NULL,
-                customer_username VARCHAR(50) NOT NULL,
+                chat_id INT NOT NULL,
+                username VARCHAR(50) NOT NULL,
                 item_link VARCHAR(255) NOT NULL,
                 description TEXT,
                 add_date DATETIME NOT NULL,
@@ -58,12 +57,12 @@ class DB:
             """, (full_name, chat_id, username, datetime.now()))
         self.connection.commit()
 
-    def add_thing(self, order_token, item_type, item_name, manufacturer, average_price, delivery_markup, customer, item_link, description=None):
+    def add_thing(self, order_token, item_type, item_name, manufacturer, average_price, delivery_markup, chat_id, username, item_link, description=None):
         with self.connection.cursor() as cursor:
             cursor.execute("""
-            INSERT INTO aph_things (order_token, item_type, item_name, manufacturer, average_price, delivery_markup, customer, item_link, description, add_date)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (order_token, item_type, item_name, manufacturer, average_price, delivery_markup, customer, item_link, description, datetime.now()))
+            INSERT INTO aph_things (order_token, item_type, item_name, manufacturer, average_price, delivery_markup, chat_id, username, item_link, description, add_date)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (order_token, item_type, item_name, manufacturer, average_price, delivery_markup, chat_id, username, item_link, description, datetime.now()))
         self.connection.commit()
 
     def get_order_by_token(self, order_token):
@@ -86,7 +85,7 @@ class DB:
         with self.connection.cursor() as cursor:
             cursor.execute("""
             SELECT * FROM aph_things
-            WHERE customer = %s
+            WHERE username = %s
             """, (username,))
             return cursor.fetchall()
 
@@ -132,18 +131,18 @@ class DB:
             """)
             return cursor.fetchall()
 
-    def get_order_by_customer(self, customer):
+    def get_order_by_customer(self, username):
         with self.connection.cursor() as cursor:
             cursor.execute("""
             SELECT * FROM aph_things
-            WHERE customer = %s
-            """, (customer,))
+            WHERE username = %s
+            """, (username,))
             return cursor.fetchall()
 
-    def get_thing_by_customer(self, customer, item_name):
+    def get_thing_by_customer(self, username, item_name):
         with self.connection.cursor() as cursor:
             cursor.execute("""
             SELECT * FROM aph_things
-            WHERE customer = %s AND item_name = %s
-            """, (customer, item_name))
+            WHERE username = %s AND item_name = %s
+            """, (username, item_name))
             return cursor.fetchone()
