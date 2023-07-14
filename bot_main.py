@@ -202,19 +202,19 @@ class AphBot:
     async def menu_salesman(self, message: types.Message, state: FSMContext):
         text = message.text
         if text == "Посмотреть заказы":
-            await state.reset_state()
-            await message.reply("Заявки:", reply_markup=self.menu_markups["salesman"])
+            await state.reset_state(with_data=False)
+            await message.reply("Заявки:", reply_markup = types.ReplyKeyboardRemove())
             orders_info = self.db.get_orders()
             for order in orders_info:
                 button1 = types.InlineKeyboardButton(text='Интересно', callback_data=order["order_token"])
                 bet_markup = types.InlineKeyboardMarkup().add(button1)
                 await message.answer(order["item_link"], reply_markup=bet_markup)
-            await message.reply("Все", reply_markup=self.menu_markups["salesman"])
-            await ST.Salesman.set()
+            button1 = types.InlineKeyboardButton(text='Ни один заказ не интересен', callback_data="away")
+            bet_markup_away = types.InlineKeyboardMarkup().add(button1)
+            await message.reply("-------------------------", reply_markup=bet_markup_away)
         elif text == "Профиль":
             user_info = self.db.get_user_by_param("username", message.from_user.username)
             if user_info is not None:
-
                 await message.answer("*Профиль* \n"
                                                 "Имя: *" + message.from_user.full_name + "*\n"
                                                 "Username: *" + "@"+ str(user_info["username"]) + "*\n"                                        
@@ -240,9 +240,28 @@ class AphBot:
         await ST.Buyer.set()
 
 
+
+
+
     async def application_interest(self, callback: types.CallbackQuery):
         token = callback.data
-        print("Привет")
+        order = self.db.get_order_by_token(token)
+        if token != "away":
+            button1 = types.InlineKeyboardButton(text='Выйти из просмотра заказов', callback_data="away")
+            bet_markup_away = types.InlineKeyboardMarkup().add(button1)
+
+            await callback.message.answer("*Заказ* \n"
+                                 "Имя заказчика: *" + "@" + str(order[0]["username"]) + "*\n"
+                                                                          "Цена товара: *" + str(
+                order[0]["average_price"]) + "*\n"
+                                         "Цена доставки: _" + str(order[0]["delivery_markup"]) + "_\n"
+                                                                                                 "Дата оформления: _" + str(
+                order[0]["add_date"]) + "_\n"
+                                        "*Ссылка*: _" + order[0]["item_link"] + "_\n",
+                                 parse_mode="Markdown", reply_markup=bet_markup_away)
+        else:
+            await callback.message.answer("Вы вышли из просмотра заказов", reply_markup=self.menu_markups["salesman"])
+            await ST.Salesman.set()
 
 
     def run(self):
