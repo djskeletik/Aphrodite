@@ -105,6 +105,7 @@ import secrets
 from aiogram import Bot, Dispatcher, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.contrib.middlewares.logging import LoggingMiddleware
+from aiogram.dispatcher import FSMContext
 from utils import ST
 
 
@@ -143,6 +144,7 @@ class AphBot:
         self.dp.message_handler(state=ST.Buyer)(self.menu_buyer)
         self.dp.message_handler(state=ST.Salesman)(self.menu_salesman)
         self.dp.message_handler(state=ST.Application_register)(self.application_register)
+        self.dp.callback_query_handler()(self.application_interest)
         # Uncomment the following line when you implement `menu_applications` function
         # self.dp.message_handler(state=ST.Application_register)(self.menu_applications)
 
@@ -171,7 +173,7 @@ class AphBot:
     async def menu_buyer(self, message: types.Message):
         text = message.text
         if text == "Зарегать заявку":
-            await message.reply("Скиньте ссылку на товар", reply_markup= None)
+            await message.reply("Скиньте ссылку на товар", reply_markup = types.ReplyKeyboardRemove())
             await ST.Application_register.set()
         elif text == "Профиль":
             user_info = self.db.get_user_by_param("username", message.from_user.username)
@@ -194,13 +196,19 @@ class AphBot:
             await message.reply("Что-то непонятное вводишь", reply_markup=self.menu_markups["buyer"])
             await ST.Buyer.set()
 
-    async def menu_salesman(self, message: types.Message):
+
+
+
+    async def menu_salesman(self, message: types.Message, state: FSMContext):
         text = message.text
         if text == "Посмотреть заказы":
+            await state.reset_state()
             await message.reply("Заявки:", reply_markup=self.menu_markups["salesman"])
             orders_info = self.db.get_orders()
             for order in orders_info:
-                await message.answer(order["item_link"])
+                button1 = types.InlineKeyboardButton(text='Интересно', callback_data=order["order_token"])
+                bet_markup = types.InlineKeyboardMarkup().add(button1)
+                await message.answer(order["item_link"], reply_markup=bet_markup)
             await message.reply("Все", reply_markup=self.menu_markups["salesman"])
             await ST.Salesman.set()
         elif text == "Профиль":
@@ -231,6 +239,10 @@ class AphBot:
         await message.reply("Закакз добавлен, ожидайте отклика продавцов", reply_markup=self.menu_markups["buyer"])
         await ST.Buyer.set()
 
+
+    async def application_interest(self, callback: types.CallbackQuery):
+        token = callback.data
+        print("Привет")
 
 
     def run(self):
