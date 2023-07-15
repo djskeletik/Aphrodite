@@ -41,6 +41,7 @@ class DB:
                 chat_id INT NOT NULL,
                 username VARCHAR(50) NOT NULL,
                 item_link VARCHAR(255) NOT NULL,
+                salesman_username TEXT,
                 description TEXT,
                 add_date DATETIME NOT NULL,
                 PRIMARY KEY (order_token, item_name)
@@ -57,12 +58,12 @@ class DB:
             """, (full_name, chat_id, username, datetime.now()))
         self.connection.commit()
 
-    def add_thing(self, order_token, item_type, item_name, manufacturer, average_price, delivery_markup, chat_id, username, item_link, description=None):
+    def add_thing(self, order_token, item_type, item_name, manufacturer, average_price, delivery_markup, chat_id, username, item_link, salesman_username, description=None):
         with self.connection.cursor() as cursor:
             cursor.execute("""
-            INSERT INTO aph_things (order_token, item_type, item_name, manufacturer, average_price, delivery_markup, chat_id, username, item_link, description, add_date)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (order_token, item_type, item_name, manufacturer, average_price, delivery_markup, chat_id, username, item_link, description, datetime.now()))
+            INSERT INTO aph_things (order_token, item_type, item_name, manufacturer, average_price, delivery_markup, chat_id, username, item_link, salesman_username, description, add_date)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (order_token, item_type, item_name, manufacturer, average_price, delivery_markup, chat_id, username, item_link, salesman_username, description, datetime.now()))
         self.connection.commit()
 
     def get_order_by_token(self, order_token):

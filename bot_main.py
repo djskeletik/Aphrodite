@@ -111,8 +111,8 @@ from utils import ST
 
 class AphBot:
     MENU_START_OPTIONS = ["Продавец", "Покупатель"]
-    MENU_SALESMAN_OPTIONS = ["Посмотреть заказы", "Профиль", "Выйти"]
-    MENU_BUYER_OPTIONS = ["Зарегать заявку", "Профиль", "Выйти"]
+    MENU_SALESMAN_OPTIONS = ["Посмотреть заказы", "Мои заказы", "Профиль", "Выйти"]
+    MENU_BUYER_OPTIONS = ["Зарегать заявку", "Мои заказы", "Профиль", "Выйти"]
     MENU_APPLICATIONS_OPTIONS = ["Выйти"]
 
     def __init__(self, token, db):
@@ -164,7 +164,7 @@ class AphBot:
             await message.answer("Вы зашли в раздел 'Продавец'", reply_markup=self.menu_markups["salesman"])
             await ST.Salesman.set()
         elif text == "Покупатель":
-            await message.reply("Вы зашли в раздел 'Покупатель'", reply_markup=self.menu_markups["buyer"])
+            await message.answer("Вы зашли в раздел 'Покупатель'", reply_markup=self.menu_markups["buyer"])
             await ST.Buyer.set()
         else:
             await message.reply("Что-то непонятное вводишь", reply_markup=self.menu_markups["start"])
@@ -189,12 +189,31 @@ class AphBot:
             else:
                 await message.reply("Ошибка при получении данных профиля", reply_markup=self.menu_markups["buyer"])
             await ST.Buyer.set()
+        elif text == "Мои заказы":
+            await message.answer("Ваши заказы:")
+            orders = self.db.get_orders_by_username(message.from_user.username)
+            for order in orders:
+                await message.answer("*Полный Заказ* \n"
+                                              "Цена товара: *" + str(order["average_price"]) + "*\n"
+                                              "Дата оформления: _" + str(order["add_date"]) + "_\n"
+                                               "*Ссылка*: _" + order["item_link"] + "_\n",
+                                              parse_mode="Markdown", reply_markup=self.menu_markups["buyer"])
+            await ST.Buyer.set()
         elif text == "Выйти":
-            await message.reply("Вы вышли из раздела 'Покупатель'", reply_markup=self.menu_markups["start"])
+            await message.answer("Вы вышли из раздела 'Покупатель'", reply_markup=self.menu_markups["start"])
             await ST.Menu.set()
         else:
             await message.reply("Что-то непонятное вводишь", reply_markup=self.menu_markups["buyer"])
             await ST.Buyer.set()
+
+
+    async def application_register(self, message: types.Message):
+        text = message.text
+        token = secrets.token_hex(16)
+        self.db.add_thing(token, "clothes", "item_name", "manufacturer", 100, 100 , message.from_user.id, message.from_user.username, text, salesman_username=None, description=None)
+        await message.reply("Заказ добавлен, ожидайте отклика продавцов", reply_markup=self.menu_markups["buyer"])
+        await ST.Buyer.set()
+
 
 
 
@@ -203,15 +222,18 @@ class AphBot:
         text = message.text
         if text == "Посмотреть заказы":
             await state.reset_state(with_data=False)
-            await message.reply("Заявки:", reply_markup = types.ReplyKeyboardRemove())
+            await message.answer("Заказы:", reply_markup = types.ReplyKeyboardRemove())
             orders_info = self.db.get_orders()
             for order in orders_info:
                 button1 = types.InlineKeyboardButton(text='Интересно', callback_data=order["order_token"])
                 bet_markup = types.InlineKeyboardMarkup().add(button1)
-                await message.answer(order["item_link"], reply_markup=bet_markup)
+                await message.answer("*Заказ* \n" 
+                                               "Цена товара: *" + str(int(
+                    order["average_price"])) + "* €\n",
+                                              parse_mode="Markdown", reply_markup=bet_markup)
             button1 = types.InlineKeyboardButton(text='Ни один заказ не интересен', callback_data="away")
             bet_markup_away = types.InlineKeyboardMarkup().add(button1)
-            await message.reply("-------------------------", reply_markup=bet_markup_away)
+            await message.answer("-------------------------------------------", reply_markup=bet_markup_away)
         elif text == "Профиль":
             user_info = self.db.get_user_by_param("username", message.from_user.username)
             if user_info is not None:
@@ -226,39 +248,36 @@ class AphBot:
                 await message.reply("Ошибка при получении данных профиля", reply_markup=self.menu_markups["buyer"])
             await ST.Salesman.set()
         elif text == "Выйти":
-            await message.reply("Вы вышли из раздела 'Продавец'", reply_markup=self.menu_markups["start"])
+            await message.answer("Вы вышли из раздела 'Продавец'", reply_markup=self.menu_markups["start"])
             await ST.Menu.set()
         else:
             await message.reply("Что-то непонятное вводишь", reply_markup=self.menu_markups["salesman"])
             await ST.Salesman.set()
 
-    async def application_register(self, message: types.Message):
-        text = message.text
-        token = secrets.token_hex(16)
-        self.db.add_thing(token, "clothes", "item_name", "manufacturer", 100, 100 ,message.from_user.id, message.from_user.username, text, description=None)
-        await message.reply("Закакз добавлен, ожидайте отклика продавцов", reply_markup=self.menu_markups["buyer"])
-        await ST.Buyer.set()
-
-
-
 
 
     async def application_interest(self, callback: types.CallbackQuery):
         token = callback.data
-        order = self.db.get_order_by_token(token)
-        if token != "away":
+        if token != "away" and "take" not in token:
+            order = self.db.get_order_by_token(token)
+            user_info = self.db.get_user_by_param("username", order[0]["username"])
             button1 = types.InlineKeyboardButton(text='Выйти из просмотра заказов', callback_data="away")
-            bet_markup_away = types.InlineKeyboardMarkup().add(button1)
+            button2 = types.InlineKeyboardButton(text='Беру заказ !', callback_data="take"+token)
+            bet_markup = types.InlineKeyboardMarkup().add(button1, button2)
 
-            await callback.message.answer("*Заказ* \n"
-                                 "Имя заказчика: *" + "@" + str(order[0]["username"]) + "*\n"
-                                                                          "Цена товара: *" + str(
-                order[0]["average_price"]) + "*\n"
-                                         "Цена доставки: _" + str(order[0]["delivery_markup"]) + "_\n"
-                                                                                                 "Дата оформления: _" + str(
-                order[0]["add_date"]) + "_\n"
-                                        "*Ссылка*: _" + order[0]["item_link"] + "_\n",
-                                 parse_mode="Markdown", reply_markup=bet_markup_away)
+            await callback.message.answer("*Полный Заказ* \n"
+                                 "Имя заказчика: " + "@" + str(order[0]["username"]) + "\n"
+                                 "Рейтинг заказчика: " + str(user_info["ratings"]) + "\n"
+                                 "Успешных сделок, как покупатель: *" + str(user_info["orders_as_buyer"]) + "*\n"                                                    
+                                 "Цена товара: *" + str(order[0]["average_price"]) + "*\n"
+                                 "Дата оформления: _" + str(order[0]["add_date"]) + "_\n"
+                                 "*Ссылка*: _" + order[0]["item_link"] + "_\n",
+                                 parse_mode="Markdown", reply_markup=bet_markup)
+        elif "take" in token:
+            token = token[4::]
+            order = self.db.get_order_by_token(token)
+            user_info = self.db.get_user_by_param("username", order[0]["username"])
+            await callback.bot.send_message(user_info["chat_id"],f"Ваш заказ взял продавец {order[0]['username']}")
         else:
             await callback.message.answer("Вы вышли из просмотра заказов", reply_markup=self.menu_markups["salesman"])
             await ST.Salesman.set()
