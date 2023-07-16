@@ -258,7 +258,7 @@ class AphBot:
 
     async def application_interest(self, callback: types.CallbackQuery):
         token = callback.data
-        if token != "away" and "take" not in token and "|" not in token and token != "seller_confirmation":
+        if token != "away" and "take" not in token:
             order = self.db.get_order_by_token(token)
             user_info = self.db.get_user_by_param("username", order[0]["username"])
             button1 = types.InlineKeyboardButton(text='Выйти из просмотра заказов', callback_data="away")
@@ -277,33 +277,7 @@ class AphBot:
             token = token[4::]
             order = self.db.get_order_by_token(token)
             user_info = self.db.get_user_by_param("username", order[0]["username"])
-            button1 = types.InlineKeyboardButton(text='Посмотреть предложение', callback_data=token + "|" + order[0]["username"])
-            bet_markup = types.InlineKeyboardMarkup().add(button1)
-            await callback.bot.send_message(user_info["chat_id"], "Ваш заказ заинтересовал продавца!", reply_markup=bet_markup)
-            await callback.message.answer("Покупатель увидит, что вы заинтересованы в его заказе")
-        elif "|" in token:
-            tok = ""
-            username = ""
-            c = False
-            #  Я честно задалболся это делать, я тут останавливаюсь и иду спать, Понятно  ??????
-            user_info = self.db.get_user_by_param("username", username)
-            button1 = types.InlineKeyboardButton(text='Согласен с продавцом!', callback_data="seller_confirmation")
-            bet_markup = types.InlineKeyboardMarkup().add(button1)
-            await callback.message.answer("*Продавец* \n"
-                                 "Имя: " + str( user_info["full_name"]) + "\n"
-                                 "Рейтинг: _" + str(user_info["ratings"]) + "_\n"
-                                 # "*Наценка*: " +  + "\n"
-                                 "*Успешных сделок, как продавец*: _" + str( user_info["orders_as_seller"]) + "_\n", parse_mode="Markdown", reply_markup=bet_markup)
-        # elif token == "seller_confirmation":
-        #     username = token[8::]
-        #     user_info = self.db.get_user_by_param("username", username)
-        #     button1 = types.InlineKeyboardButton(text='Согласен с продавцом!', callback_data="seller_confirmation")
-        #     bet_markup = types.InlineKeyboardMarkup().add(button1)
-        #     await callback.message.answer("*Продавец* \n"
-        #                          "Имя: " + str( user_info["full_name"]) + "\n"
-        #                          "Рейтинг: _" + str(user_info["ratings"]) + "_\n"
-        #                          # "*Наценка*: " +  + "\n"
-        #                          "*Успешных сделок, как продавец*: _" + str( user_info["orders_as_seller"]) + "_\n", parse_mode="Markdown", reply_markup=bet_markup)
+            await callback.bot.send_message(user_info["chat_id"],f"Ваш заказ взял продавец {order[0]['username']}")
         else:
             await callback.message.answer("Вы вышли из просмотра заказов", reply_markup=self.menu_markups["salesman"])
             await ST.Salesman.set()
