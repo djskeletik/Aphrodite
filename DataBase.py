@@ -78,6 +78,7 @@ class DB:
         with self.connection.cursor() as cursor:
             cursor.execute("""
             SELECT * FROM aph_things
+            ORDER BY add_date
             """)
             return cursor.fetchall()
 
