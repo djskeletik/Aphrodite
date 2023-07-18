@@ -44,6 +44,7 @@ class DB:
                 salesman_username TEXT,
                 description TEXT,
                 add_date DATETIME NOT NULL,
+                status INT DEFAULT 0,
                 PRIMARY KEY (order_token, item_name)
             )
             """)
@@ -78,7 +79,8 @@ class DB:
         with self.connection.cursor() as cursor:
             cursor.execute("""
             SELECT * FROM aph_things
-            ORDER BY add_date
+            WHERE status = 0
+            ORDER BY add_date 
             """)
             return cursor.fetchall()
 
@@ -148,6 +150,14 @@ class DB:
             """, (username,))
             return cursor.fetchall()
 
+    def get_order_by_salesman_username(self, salesman_username):
+        with self.connection.cursor() as cursor:
+            cursor.execute("""
+            SELECT * FROM aph_things
+            WHERE salesman_username = %s
+            """, (salesman_username,))
+            return cursor.fetchall()
+
     def get_thing_by_customer(self, username, item_name):
         with self.connection.cursor() as cursor:
             cursor.execute("""
@@ -155,3 +165,21 @@ class DB:
             WHERE username = %s AND item_name = %s
             """, (username, item_name))
             return cursor.fetchone()
+
+    def update_status_in_order(self, status, token):
+        with self.connection.cursor() as cursor:
+            cursor.execute(f"""
+            UPDATE aph_things
+            SET status = %s
+            WHERE order_token = %s
+            """, (status, token))
+        self.connection.commit()
+
+    def update_salesman_username_in_order(self, salesman_username, token):
+        with self.connection.cursor() as cursor:
+            cursor.execute(f"""
+            UPDATE aph_things
+            SET salesman_username = %s
+            WHERE order_token = %s
+            """, (salesman_username, token))
+        self.connection.commit()
