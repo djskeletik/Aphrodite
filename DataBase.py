@@ -22,7 +22,7 @@ class DB:
                 chat_id INT NOT NULL,
                 username VARCHAR(50) NOT NULL,
                 join_date DATETIME NOT NULL,
-                ratings JSON DEFAULT NULL,
+                ratings FLOAT DEFAULT 0.0,
                 orders_as_seller INT DEFAULT 0,
                 orders_as_buyer INT DEFAULT 0,
                 feedbacks JSON DEFAULT NULL,
