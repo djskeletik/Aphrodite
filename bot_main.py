@@ -106,8 +106,9 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.contrib.middlewares.logging import LoggingMiddleware
 from aiogram.dispatcher import FSMContext
+from aiogram.types import CallbackQuery
+from aiogram_calendar import dialog_cal_callback, DialogCalendar
 from utils import ST
-
 
 class AphBot:
     MENU_START_OPTIONS = ["Продавец", "Покупатель"]
@@ -145,6 +146,7 @@ class AphBot:
         self.dp.message_handler(state=ST.Salesman)(self.menu_salesman)
         self.dp.message_handler(state=ST.Application_register)(self.application_register)
         self.dp.callback_query_handler()(self.application_interest)
+        self.dp.callback_query_handler()(self.process_dialog_calendar)
         # Uncomment the following line when you implement `menu_applications` function
         # self.dp.message_handler(state=ST.Application_register)(self.menu_applications)
 
@@ -178,12 +180,15 @@ class AphBot:
         elif text == "Профиль":
             user_info = self.db.get_user_by_param("username", message.from_user.username)
             if user_info is not None:
-
+                if user_info["number_of_ratings"] == 0:
+                    a = 1
+                else:
+                    a = user_info["number_of_ratings"]
                 await message.answer("*Профиль* \n"
                                                 "Имя: *" + message.from_user.full_name + "*\n"
                                                 "Username: *" + "@"+ str(user_info["username"]) + "*\n"                                        
                                                 "Дата присоединения: _" + str(user_info["join_date"]) + "_\n"
-                                                "Рейтинг: _" + str(user_info["ratings"]) + "_\n"                                                        
+                                                "Рейтинг: _" + str(round(user_info["sum_of_ratings"]/a,2)) + "_\n"                                                        
                                                 "*Успешных сделок, как покупатель*: _" + str(user_info["orders_as_buyer"]) + "_\n", parse_mode="Markdown", reply_markup=self.menu_markups["buyer"])
 
             else:
@@ -251,7 +256,7 @@ class AphBot:
                 #         order["average_price"])) + "* €\n",
                 #                          parse_mode="Markdown", reply_markup=bet_markup)
                 # else:
-                button1 = types.InlineKeyboardButton(text='Интересно', callback_data=order["order_token"])
+                button1 = types.InlineKeyboardButton(text='Интересно', callback_data="token" + "|" + order["order_token"])
                 bet_markup = types.InlineKeyboardMarkup().add(button1)
                 await message.answer("*Заказ* \n" 
                                      "Цена товара: *" + str(int( order["average_price"])) + "* €\n", parse_mode="Markdown", reply_markup=bet_markup)
@@ -261,12 +266,16 @@ class AphBot:
             await message.answer("-------------------------------------------", reply_markup=bet_markup_away)
         elif text == "Профиль":
             user_info = self.db.get_user_by_param("username", message.from_user.username)
+            if user_info["number_of_ratings"] == 0:
+                a = 1
+            else:
+                a = user_info["number_of_ratings"]
             if user_info is not None:
                 await message.answer("*Профиль* \n"
                                                 "Имя: *" + message.from_user.full_name + "*\n"
                                                 "Username: *" + "@"+ str(user_info["username"]) + "*\n"                                        
                                                 "Дата присоединения: _" + str(user_info["join_date"]) + "_\n"
-                                                "Рейтинг: _" + str(user_info["ratings"]) + "_\n"    
+                                                "Рейтинг: _" + str(round(user_info["sum_of_ratings"]/a,2)) + "_\n"    
                                                 "*Успешных сделок, как продавец*: _" + str(user_info["orders_as_seller"]) + "_\n", parse_mode="Markdown", reply_markup=self.menu_markups["salesman"])
 
             else:
@@ -288,7 +297,7 @@ class AphBot:
                                          "Ссылка: " + order["item_link"] + "\n",
                                          parse_mode="Markdown", reply_markup=bet_markup)
                 else:
-                    button3 = types.InlineKeyboardButton(text='Заказ передан', callback_data="end" + "|" +order["order_token"])
+                    button3 = types.InlineKeyboardButton(text='Заказ передан', callback_data="кон" + "|" +order["order_token"])
                     bet_markup = types.InlineKeyboardMarkup().add(button3)
                     await message.answer("*Полный Заказ* \n"
                                          "Цена товара: " + str(int(order["average_price"])) + " €\n"
@@ -307,8 +316,24 @@ class AphBot:
             await ST.Salesman.set()
 
 
+    async def process_dialog_calendar(self, callback_query: CallbackQuery, callback_data: dict, state: FSMContext):
+        print("Yes")
+        selected, date = await DialogCalendar().process_selection(callback_query, callback_data)
+        if selected:
+            d = await state.get_data()
+            if 'start_date' in d:
+                # Ввели вторую дату, можно работать со state
+                await state.update_data(end_date=f'{date.strftime("%d.%m.%Y")}')
+                d = await state.get_data()
+                await callback_query.message.answer(f'Finish, state={d}')
+                await state.reset_state(with_data=True)
+            else:
+                await state.update_data(start_date=f'{date.strftime("%d.%m.%Y")}')
+                await callback_query.message.answer(
+                    f'Вы выбрали: {date.strftime("%d/%m/%Y")}\nВыберите конечную дату:',
+                    reply_markup=await DialogCalendar().start_calendar())
 
-    async def application_interest(self, callback: types.CallbackQuery):
+    async def application_interest(self, callback: types.CallbackQuery, state: FSMContext):
         token = callback.data
         if "take" in token:
             print(callback.message.message_id)
@@ -324,15 +349,11 @@ class AphBot:
                 await callback.message.answer("Сколько процентов вы хотите взять сверху ?", reply_markup=bet_markup)
             else:
                 await callback.message.answer("Извините, заказ уже нашел своего покупателя")
-        # if "date" in token:
-        #     token = token.split("|")
-        #     token = token[1]
-        #     order = self.db.get_order_by_token(token)
-        #     user_info = self.db.get_user_by_param("username", order[0]["username"])
-        #     button1 = types.InlineKeyboardButton(text='Посмотреть предложение', callback_data="п"+"|"+token + "|" + order[0]["username"])
-        #     bet_markup = types.InlineKeyboardMarkup().add(button1)
-        #     await callback.bot.send_message(user_info["chat_id"], "Ваш заказ заинтересовал продавца!", reply_markup=bet_markup)
-        #     await callback.message.answer("Покупатель увидит, что вы заинтересованы в его заказе")
+
+        elif "г" in token:
+            await state.reset_state(with_data=False)
+            await callback.message.answer("Выберите дату: ", reply_markup=await DialogCalendar().start_calendar())
+
         elif "п" in token:
             token = token.split("|")
             percent = token[2]
@@ -342,8 +363,8 @@ class AphBot:
                 user_info = self.db.get_user_by_param("username", order[0]["username"])
                 button1 = types.InlineKeyboardButton(text='Посмотреть предложение', callback_data="д"+"|"+token + "|" + str(callback.message.chat.id) + "|" + percent)
                 bet_markup = types.InlineKeyboardMarkup().add(button1)
-                state = self.dp.current_state(chat=user_info["chat_id"], user=user_info["chat_id"])
-                await state.reset_state(with_data=False)
+                state = self.dp.current_state(chat=user_info["chat_id"])
+                await state.reset_state()
                 await callback.bot.send_message(user_info["chat_id"], "Ваш заказ заинтересовал продавца!", reply_markup=bet_markup)
                 await callback.message.answer("Покупатель увидит, что вы заинтересованы в его заказе")
             else:
@@ -360,10 +381,14 @@ class AphBot:
             percent_price = (int(percent) / 100) * order_info[0]["average_price"]
             button1 = types.InlineKeyboardButton(text='Согласен с продавцом!', callback_data="с"+"|"+token+"|"+chat_id)
             bet_markup = types.InlineKeyboardMarkup().add(button1)
+            if user_info["number_of_ratings"] == 0:
+                a = 1
+            else:
+                a = user_info["number_of_ratings"]
             await callback.message.answer(
                                  "*Продавец* \n"
                                  "Имя: " + str( user_info["full_name"]) + "\n"
-                                 "Рейтинг: " + str(user_info["ratings"]) + "\n"
+                                 "Рейтинг: " + str(round(user_info["sum_of_ratings"]/a,2)) + "\n"
                                  "Успешных сделок, как продавец: " + str( user_info["orders_as_seller"]) + "\n"
                                  "-------------------------------------------\n"
                                  "*Предлагает* \n"
@@ -380,10 +405,10 @@ class AphBot:
             user_info = self.db.get_user_by_param("chat_id", chat_id)
             self.db.update_salesman_username_in_order(user_info["username"], token)
             order_info = self.db.get_order_by_token(token)
-            button1 = types.InlineKeyboardButton(text='Выйти из просмотра заказов', callback_data="away" + "|"+"salesman")
+            button1 = types.InlineKeyboardButton(text='Выйти из просмотра заказов', callback_data="away" + "|" + "salesman")
             bet_markup = types.InlineKeyboardMarkup().add(button1)
             await callback.message.answer("Ваш заказ нашел своего продавца", reply_markup=bet_markup)
-            await callback.bot.send_message(user_info["chat_id"], f"Покупатель @{callback.message.chat.username} согласен с вашим предложением, а этот заказ появился в списке заказов, над которыми в работаете",reply_markup=bet_markup)
+            await callback.bot.send_message(user_info["chat_id"], f"Покупатель @{callback.message.chat.username} согласен с вашим предложением, а этот заказ появился в списке заказов, над которыми в работаете")
         elif "delete" in token:
             token = token.split("|")
             type = token[2]
@@ -392,7 +417,7 @@ class AphBot:
             if order[0]["status"] == 0:
                 self.db.delete_order(token)
                 await callback.message.delete()
-                button1 = types.InlineKeyboardButton(text='Выйти из просмотра заказов', callback_data="away"+ type)
+                button1 = types.InlineKeyboardButton(text='Выйти из просмотра заказов', callback_data="away"+ "|" + type)
                 bet_markup = types.InlineKeyboardMarkup().add(button1)
                 await callback.message.answer("Заказ удален", reply_markup=bet_markup)
             else:
@@ -409,7 +434,7 @@ class AphBot:
             button1 = types.InlineKeyboardButton(text='Выйти из просмотра своих заказов', callback_data="away" + "|" + "salesman")
             bet_markup = types.InlineKeyboardMarkup().add(button1)
             await callback.message.answer("Заказ изменил свой статус !",reply_markup=bet_markup)
-            await callback.bot.send_message(user_info["chat_id"], "Ваш заказ изменил свой статус !", reply_markup=bet_markup)
+            await callback.bot.send_message(user_info["chat_id"], "Ваш заказ изменил свой статус !")
 
         elif "refusal" in token:
             token = token.split("|")
@@ -421,14 +446,13 @@ class AphBot:
                 button1 = types.InlineKeyboardButton(text='Выйти из просмотра своих заказов',callback_data="away" + "|" + "salesman")
                 bet_markup = types.InlineKeyboardMarkup().add(button1)
                 await callback.message.answer("Вы отказались работать над проектом, ваш рейтинг снизиться", reply_markup=bet_markup)
-                await callback.bot.send_message(user_info["chat_id"], "Продавец отказался работать над вашим проектом, просим прощения(",
-                                                reply_markup=bet_markup)
+                await callback.bot.send_message(user_info["chat_id"], "Продавец отказался работать над вашим проектом, просим прощения(")
             else:
                 button1 = types.InlineKeyboardButton(text='Выйти из просмотра своих заказов', callback_data="away" + "|" + "salesman")
                 bet_markup = types.InlineKeyboardMarkup().add(button1)
                 await callback.message.reply("Вы не можете от него отказаться",reply_markup=bet_markup)
 
-        elif "end" in token:
+        elif "кон" in token:
             token = token.split("|")
             token = token[1]
             button1 = types.InlineKeyboardButton(text='Да', callback_data="Да" + "|" + token)
@@ -438,20 +462,35 @@ class AphBot:
             bet_markup = types.InlineKeyboardMarkup().add(button1, button2)
             await callback.message.answer("Мы спросим у покупателя, получил ли он товар", reply_markup=bet_markup_away)
             order_info = self.db.get_order_by_token(token)
+            await callback.bot.send_message(order_info[0]["chat_id"],"!", reply_markup = types.ReplyKeyboardRemove())
             await callback.bot.send_message(order_info[0]["chat_id"],f"Пришел этот заказ: {order_info[0]['item_link']} ?", reply_markup=bet_markup)
 
         elif "Да" in token:
             token = token.split("|")
             token = token[1]
-            button3 = types.InlineKeyboardButton(text='Выйти из просмотра своих заказов',
-                                                 callback_data="away" + "|" + "salesman")
-            bet_markup_away = types.InlineKeyboardMarkup().add(button3)
-            await callback.message.answer("Ура! Заказ передан !", reply_markup=bet_markup_away)
             order_info = self.db.get_order_by_token(token)
             user_info = self.db.get_user_by_param("username", order_info[0]["salesman_username"])
+            button1 = types.InlineKeyboardButton(text='1', callback_data="о" + "|" + str(user_info["chat_id"]) + "|" + "1")
+            button2 = types.InlineKeyboardButton(text='2', callback_data="о" + "|" + str(user_info["chat_id"]) + "|" + "2")
+            button3 = types.InlineKeyboardButton(text='3', callback_data="о" + "|" + str(user_info["chat_id"]) + "|" + "3")
+            button4 = types.InlineKeyboardButton(text='4', callback_data="о" + "|" + str(user_info["chat_id"]) + "|" + "4")
+            button5 = types.InlineKeyboardButton(text='5', callback_data="о" + "|" + str(user_info["chat_id"]) + "|" + "5")
+            bet_markup = types.InlineKeyboardMarkup().add(button1, button2, button3, button4, button5)
+            button6 = types.InlineKeyboardButton(text='Выйти из просмотра своих заказов', callback_data="away" + "|" + "salesman")
+            bet_markup_away = types.InlineKeyboardMarkup().add(button6)
+            await callback.message.answer("Ура! Заказ передан !\nКак вы оценили бы работу продавца ?", reply_markup=bet_markup)
             self.db.delete_order(token)
-            await callback.bot.send_message(user_info["chat_id"],"Заказчик все подтвердил, доставка заказ окончена !", reply_markup=bet_markup_away)
+            await callback.bot.send_message(user_info["chat_id"],"Заказчик все подтвердил, доставка заказа окончена !", reply_markup=bet_markup_away)
 
+        elif "о" in token:
+            token = token.split("|")
+            chat_id = int(token[1])
+            rating = int(token[2])
+            print(chat_id)
+            button6 = types.InlineKeyboardButton(text='Выйти из просмотра своих заказов',  callback_data="away" + "|" + "salesman")
+            bet_markup_away = types.InlineKeyboardMarkup().add(button6)
+            self.db.update_rating_in_user(chat_id, rating)
+            await callback.message.answer("Спасибо", reply_markup=bet_markup_away)
         elif "away" in token:
             token = token.split("|")
             type = token[1]
@@ -460,16 +499,22 @@ class AphBot:
                 await ST.Buyer.set()
             else:
                 await ST.Salesman.set()
-        else:
+        elif "token" in token:
+            token = token.split("|")
+            token = token[1]
             order = self.db.get_order_by_token(token)
             user_info = self.db.get_user_by_param("username", order[0]["username"])
             button1 = types.InlineKeyboardButton(text='Выйти из просмотра заказов', callback_data="away" + "|"+"salesman")
             button2 = types.InlineKeyboardButton(text='Беру заказ !', callback_data="take" + "|" + token)
             if order[0]["status"] == 0:
                 bet_markup = types.InlineKeyboardMarkup().add(button1, button2)
-                await callback.message.answer("*Продавец* \n"
+                if user_info["number_of_ratings"] == 0:
+                    a = 1
+                else:
+                    a = user_info["number_of_ratings"]
+                await callback.message.answer("*Покупатель* \n"
                                               "Имя заказчика: "  + str(user_info["full_name"]) + "\n"
-                                              "Рейтинг заказчика: " + str( user_info["ratings"]) + "\n"
+                                              "Рейтинг заказчика: " + str(round(user_info["sum_of_ratings"]/a,2)) + "\n"
                                               "Успешных сделок, как покупатель: *" + str(user_info["orders_as_buyer"]) + "*\n"
                                               "-------------------------------------------\n"
                                               "*Товар* \n"
@@ -480,6 +525,16 @@ class AphBot:
                 button1 = types.InlineKeyboardButton(text='Выйти из просмотра заказов', callback_data="away")
                 bet_markup = types.InlineKeyboardMarkup().add(button1)
                 await callback.message.answer("Извините, заказ уже нашел своего покупателя", reply_markup=bet_markup)
+        else:
+            print("juj")
+            # token.split(":")
+            # token = {'@': token[0], 'act': token[1], 'year': token[2], 'month': token[3], 'day': token[4]}
+            # selected, date = await DialogCalendar().process_selection(callback, token)
+            # await state.update_data(start_date=f'{date.strftime("%d.%m.%Y")}')
+            # print("Yes")
+            # await callback.message.answer(
+            #             f'Вы выбрали: {date.strftime("%d/%m/%Y")}\nВыберите конечную дату:',
+            #             reply_markup=await DialogCalendar().start_calendar())
 
     def run(self):
         from aiogram import executor

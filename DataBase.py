@@ -22,7 +22,8 @@ class DB:
                 chat_id INT NOT NULL,
                 username VARCHAR(50) NOT NULL,
                 join_date DATETIME NOT NULL,
-                ratings FLOAT DEFAULT 0.0,
+                number_of_ratings INT DEFAULT 0,
+                sum_of_ratings INT DEFAULT 0,
                 orders_as_seller INT DEFAULT 0,
                 orders_as_buyer INT DEFAULT 0,
                 feedbacks JSON DEFAULT NULL,
@@ -173,6 +174,17 @@ class DB:
             SET status = %s
             WHERE order_token = %s
             """, (status, token))
+        self.connection.commit()
+
+    def update_rating_in_user(self, chat_id, rating):
+        with self.connection.cursor() as cursor:
+            print(chat_id)
+            print(rating)
+            cursor.execute(f"""
+            UPDATE aph_users
+            SET number_of_ratings = number_of_ratings + 1, sum_of_ratings = sum_of_ratings + %s
+            WHERE chat_id = %s
+            """, (rating, chat_id))
         self.connection.commit()
 
     def update_salesman_username_in_order(self, salesman_username, token):
