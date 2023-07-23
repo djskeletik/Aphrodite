@@ -45,6 +45,7 @@ class DB:
                 salesman_username TEXT,
                 description TEXT,
                 add_date DATETIME NOT NULL,
+                finish_date INT,
                 status INT DEFAULT 0,
                 PRIMARY KEY (order_token, item_name)
             )
@@ -178,8 +179,6 @@ class DB:
 
     def update_rating_in_user(self, chat_id, rating):
         with self.connection.cursor() as cursor:
-            print(chat_id)
-            print(rating)
             cursor.execute(f"""
             UPDATE aph_users
             SET number_of_ratings = number_of_ratings + 1, sum_of_ratings = sum_of_ratings + %s
@@ -194,4 +193,22 @@ class DB:
             SET salesman_username = %s
             WHERE order_token = %s
             """, (salesman_username, token))
+        self.connection.commit()
+
+    def update_percent_and_date_in_order(self, percent, date, token):
+        with self.connection.cursor() as cursor:
+            cursor.execute(f"""
+            UPDATE aph_things
+            SET delivery_markup = %s, finish_date = %s
+            WHERE order_token = %s
+            """, (percent, date, token))
+        self.connection.commit()
+
+    def update_number_oreders_in_param(self, param, chat_id):
+        with self.connection.cursor() as cursor:
+            cursor.execute(f"""
+            UPDATE aph_users
+            SET {param} = {param} + 1
+            WHERE chat_id = %s
+            """, (chat_id))
         self.connection.commit()
