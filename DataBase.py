@@ -45,7 +45,7 @@ class DB:
                 salesman_username TEXT,
                 description TEXT,
                 add_date DATETIME NOT NULL,
-                finish_date INT,
+                finish_date TEXT,
                 status INT DEFAULT 0,
                 PRIMARY KEY (order_token, item_name)
             )
